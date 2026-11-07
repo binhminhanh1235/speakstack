@@ -1,0 +1,20 @@
+[
+  {
+    "id": "focus-ambient",
+    "title": "Deep Focus Ambient (WebAudio Synth)",
+    "file": "synth:ambient",
+    "mood": "focus"
+  },
+  {
+    "id": "lofi-pulse",
+    "title": "Warm Lo-Fi Pulse (WebAudio Synth)",
+    "file": "synth:lofi",
+    "mood": "calm"
+  },
+  {
+    "id": "interview-calm",
+    "title": "Interview Calm Drone (WebAudio Synth)",
+    "file": "synth:drone",
+    "mood": "steady"
+  }
+]

@@ -213,27 +213,40 @@ export function PracticeStage({
     setActiveWordIdx(0);
     boundaryTriggeredRef.current = false;
 
-    const startTime = Date.now();
-    paceTimerRef.current = setInterval(() => {
-      if (runId !== runIdRef.current) return;
-      if (boundaryTriggeredRef.current) return; // Let TTS onboundary drive if active
-      const elapsed = Date.now() - startTime;
-      const idx = findWordIndexAtTime(timeline.tokens, elapsed);
-      setActiveWordIdx(idx);
-
-      if (elapsed >= timeline.totalDurationMs + 250) {
-        clearInterval(paceTimerRef.current);
-        paceTimerRef.current = null;
-        if (!settings.ttsEnabled) {
-          handleSegmentPlaybackEnded(runId);
+    // With TTS, the highlight clock must start when audio actually starts
+    // (not at click time), and real word boundaries override the estimate.
+    const ttsOn = !!settings.ttsEnabled;
+    const ttsTimeline = ttsOn
+      ? buildKaraokeTimeline(currentSegment.en, currentSegment.keywords, 160, settings.ttsRate || 1)
+      : timeline;
+    let clockStarted = false;
+    const startClock = () => {
+      if (clockStarted || runId !== runIdRef.current) return;
+      clockStarted = true;
+      const startTime = Date.now();
+      paceTimerRef.current = setInterval(() => {
+        if (runId !== runIdRef.current) return;
+        if (boundaryTriggeredRef.current) return; // real TTS boundaries drive
+        const elapsed = Date.now() - startTime;
+        const idx = findWordIndexAtTime(ttsTimeline.tokens, elapsed);
+        setActiveWordIdx(idx);
+        if (elapsed >= ttsTimeline.totalDurationMs + 250) {
+          clearInterval(paceTimerRef.current);
+          paceTimerRef.current = null;
+          if (!ttsOn) handleSegmentPlaybackEnded(runId);
         }
-      }
-    }, 50);
+      }, 50);
+    };
 
-    if (settings.ttsEnabled) {
+    if (ttsOn) {
+      const safety = setTimeout(startClock, 2000); // onstart never fired
       speakSegmentText(currentSegment.en, {
         rate: settings.ttsRate,
         voiceURI: settings.voiceURI,
+        onStart: () => {
+          clearTimeout(safety);
+          startClock();
+        },
         onWordBoundary: (charIndex) => {
           if (runId !== runIdRef.current) return;
           boundaryTriggeredRef.current = true;
@@ -241,9 +254,12 @@ export function PracticeStage({
           if (idx >= 0) setActiveWordIdx(idx);
         },
         onEnd: () => {
+          clearTimeout(safety);
           handleSegmentPlaybackEnded(runId);
         }
       });
+    } else {
+      startClock();
     }
   };
 

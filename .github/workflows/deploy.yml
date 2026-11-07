@@ -1,4 +1,4 @@
-name: Build & Deploy to EdgeOne
+name: CI - Build & Test
 
 on:
   push:
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build-and-test:
-    name: Build & Test
+    name: Test & Build Integrity
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -33,45 +33,5 @@ jobs:
       - name: Run unit tests
         run: npm test
 
-      - name: Build project
+      - name: Verify build
         run: npm run build
-
-      - name: Upload build artifacts
-        if: github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist
-          retention-days: 7
-
-  deploy:
-    name: Deploy to EdgeOne
-    needs: build-and-test
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist
-
-      - name: Deploy to EdgeOne Makers
-        env:
-          EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
-          EDGEONE_PROJECT_NAME: ${{ vars.EDGEONE_PROJECT_NAME || 'speakstack' }}
-        run: |
-          if [ -z "$EDGEONE_API_TOKEN" ]; then
-            echo "::error::Secret EDGEONE_API_TOKEN is missing! Please configure EDGEONE_API_TOKEN in GitHub Repository Settings -> Secrets and variables -> Actions."
-            exit 1
-          fi
-          echo "Deploying project '$EDGEONE_PROJECT_NAME' to EdgeOne production..."
-          npx edgeone makers deploy dist -n "$EDGEONE_PROJECT_NAME" -t "$EDGEONE_API_TOKEN" -e production

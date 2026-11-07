@@ -8,10 +8,10 @@ import {
   getPackIndexFromStore,
   getTopicsSummary,
   rebuildIndexInStore
-} from './_lib/store';
-import { getTemplateSpec } from '../shared/templates';
-import { validatePack } from '../shared/validator';
-import { TemplateType } from '../shared/schema';
+} from './store';
+import { getTemplateSpec } from '../../shared/templates';
+import { validatePack } from '../../shared/validator';
+import { TemplateType } from '../../shared/schema';
 
 export function jsonResponse(data: any, status = 200): Response {
   return new Response(JSON.stringify(data, null, 2), {

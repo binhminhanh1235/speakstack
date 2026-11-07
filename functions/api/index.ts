@@ -1,4 +1,4 @@
-import { handleApiRequest } from '../router';
+import { handleApiRequest } from '../_lib/router';
 
 export async function onRequest(context: any) {
   return handleApiRequest(context.request, context);

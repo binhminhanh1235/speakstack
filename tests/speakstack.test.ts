@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { STARTER_PACKS, getTemplateSpec } from '../shared/templates';
 import { validatePack } from '../shared/validator';
-import { handleApiRequest, handleMcpRequest } from '../functions/router';
+import { handleApiRequest, handleMcpRequest } from '../functions/_lib/router';
 import { alignSpokenToTarget, scoreWordSimilarity } from '../src/lib/speech/dictation';
 
 describe('SpeakStack Shared Validator & Starter Packs', () => {

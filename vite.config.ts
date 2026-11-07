@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
-import { handleApiRequest, handleMcpRequest } from './functions/router';
+import { handleApiRequest, handleMcpRequest } from './functions/_lib/router';
 
 function speakstackDevServerPlugin() {
   return {

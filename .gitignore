@@ -9,6 +9,7 @@ pnpm-debug.log*
 dist/
 dist-ssr/
 coverage/
+*.zip
 
 # Environment files
 .env

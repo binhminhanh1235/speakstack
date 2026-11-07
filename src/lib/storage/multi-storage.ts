@@ -81,6 +81,61 @@ export async function loadAllPacksUnified(): Promise<{
     const merged = Array.from(packMap.values());
     await idbSavePacks(merged);
     for (const p of merged) speculativePackCache.set(p.id, p);
+  } else {
+    // Fallback: sync via MCP tools/call (list_packs + get_pack) if REST API is unreachable
+    try {
+      const mcpRes = await fetch('/mcp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: Date.now(),
+          method: 'tools/call',
+          params: { name: 'list_packs', arguments: {} }
+        })
+      });
+      if (mcpRes.ok) {
+        const json: any = await mcpRes.json();
+        const contentText = json?.result?.content?.[0]?.text;
+        if (contentText) {
+          const parsed = JSON.parse(contentText);
+          if (Array.isArray(parsed?.packs)) {
+            let hasNew = false;
+            for (const entry of parsed.packs) {
+              if (!packMap.has(entry.id)) {
+                const getPackRes = await fetch('/mcp', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: Date.now(),
+                    method: 'tools/call',
+                    params: { name: 'get_pack', arguments: { id: entry.id } }
+                  })
+                });
+                if (getPackRes.ok) {
+                  const gJson: any = await getPackRes.json();
+                  const gText = gJson?.result?.content?.[0]?.text;
+                  if (gText) {
+                    const gParsed = JSON.parse(gText);
+                    if (gParsed?.pack?.id) {
+                      packMap.set(gParsed.pack.id, gParsed.pack);
+                      hasNew = true;
+                    }
+                  }
+                }
+              }
+            }
+            if (hasNew) {
+              const merged = Array.from(packMap.values());
+              await idbSavePacks(merged);
+              for (const p of merged) speculativePackCache.set(p.id, p);
+            }
+            isOfflineFallback = false;
+          }
+        }
+      }
+    } catch {}
   }
 
   const finalPacks = Array.from(packMap.values());

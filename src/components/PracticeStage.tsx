@@ -24,6 +24,7 @@ import { startMicRecorderAndMonitor, MicSessionHandle } from '../lib/speech/reco
 import { musicController } from '../lib/audio/music-ducking';
 import { FlowDiagram } from './FlowDiagram';
 import { TypingBlock } from './TypingBlock';
+import { Collapsible } from './Collapsible';
 
 interface PracticeStageProps {
   pack: SpeakPack;
@@ -461,7 +462,7 @@ export function PracticeStage({
     <section className={`practice-stage template-${pack.template}`} data-testid="practice-stage">
       {/* Top Question & Tier/Mode Bar */}
       <div className="question-banner">
-        <div className="question-meta-row">
+        <Collapsible title="⚙️ Chủ đề & độ dài" className="question-meta-row">
           <span className={`template-pill pill-${pack.template}`}>
             {TEMPLATE_META[pack.template]?.titleVi || pack.template}
           </span>
@@ -480,7 +481,7 @@ export function PracticeStage({
               </button>
             ))}
           </div>
-        </div>
+        </Collapsible>
 
         <h1 className="question-en" data-testid="question-en">{pack.question.en}</h1>
         <p className="question-vi" data-testid="question-vi">{pack.question.vi}</p>
@@ -505,14 +506,17 @@ export function PracticeStage({
             className={`mode-tab-btn ${mode === m.id ? 'active' : ''}`}
             onClick={() => onModeChange(m.id)}
             data-testid={`mode-tab-${m.id}`}
+            aria-label={m.label}
+            title={m.label}
           >
             <span>{m.icon}</span>
-            <span>{m.label}</span>
+            <span className="mode-label">{m.label}</span>
           </button>
         ))}
       </div>
 
       {/* Template Label Progress Stepper */}
+      <Collapsible title="📍 Tiến trình khung trả lời" className="stepper-wrap">
       <div className="template-stepper" aria-label="Tiến trình nhãn câu trả lời" data-testid="template-stepper">
         {templateLabels.map((lbl, idx) => {
           const isCurrentLabel = currentSegment?.label === lbl;
@@ -536,6 +540,7 @@ export function PracticeStage({
           );
         })}
       </div>
+      </Collapsible>
 
       {/* Main Content Split: Stage + Flow Diagram */}
       <div className="stage-main-grid">
@@ -685,7 +690,7 @@ export function PracticeStage({
                 <div className="segment-badge-group">
                   <span className="badge-label">{currentSegment.label.toUpperCase()}</span>
                   <span className="segment-counter">
-                    Segment {segIndex + 1} / {filteredSegments.length} (Tier {currentSegment.tier})
+                    <span className="seg-full">Segment </span>{segIndex + 1} / {filteredSegments.length}<span className="seg-full"> (Tier {currentSegment.tier})</span>
                   </span>
                 </div>
 
@@ -732,6 +737,7 @@ export function PracticeStage({
               </div>
 
               {/* Keywords Bar */}
+              <Collapsible title="🔑 Keywords" className="kw-collapse">
               <div className="segment-keywords-bar">
                 <span className="kw-title">Keywords:</span>
                 {(currentSegment.keywords || []).map((kw) => (
@@ -740,9 +746,11 @@ export function PracticeStage({
                   </span>
                 ))}
               </div>
+              </Collapsible>
 
               {/* Up-next preview (dimmed) */}
               {(mode === 'listen' || mode === 'shadow') && (
+                <Collapsible title="⏭ Segment tiếp theo" className="next-collapse">
                 <div className="next-segment-preview" data-testid="next-segment-preview">
                   <span className="next-seg-title">
                     {nextSegment ? `Tiếp theo · ${nextSegment.label.toUpperCase()}` : 'Segment cuối'}
@@ -754,6 +762,7 @@ export function PracticeStage({
                     </div>
                   )}
                 </div>
+                </Collapsible>
               )}
 
               {/* Controls Bar */}
@@ -764,8 +773,9 @@ export function PracticeStage({
                   onClick={restartFromBeginning}
                   title="Phát lại câu phỏng vấn từ segment đầu tiên"
                   data-testid="restart-pack-btn"
+                  aria-label="Từ đầu"
                 >
-                  ⏮ Từ đầu
+                  <span aria-hidden="true">⏮</span><span className="btn-label"> Từ đầu</span>
                 </button>
 
                 <button
@@ -774,8 +784,9 @@ export function PracticeStage({
                   disabled={segIndex === 0}
                   onClick={() => setSegIndex((i) => Math.max(0, i - 1))}
                   data-testid="prev-seg-btn"
+                  aria-label="Segment trước"
                 >
-                  ← Trước
+                  <span aria-hidden="true">◀</span><span className="btn-label"> Trước</span>
                 </button>
 
                 <button
@@ -783,8 +794,10 @@ export function PracticeStage({
                   className="btn btn-primary"
                   onClick={togglePlayback}
                   data-testid="play-karaoke-btn"
+                  aria-label="Phát / Tạm dừng"
                 >
-                  {isPlaying || autoPlay ? '⏸ Tạm dừng (Space)' : '▶️ Phát Karaoke (Space)'}
+                  <span aria-hidden="true">{isPlaying || autoPlay ? '⏸' : '▶'}</span>
+                  <span className="btn-label">{isPlaying || autoPlay ? ' Tạm dừng (Space)' : ' Phát Karaoke (Space)'}</span>
                 </button>
 
                 <button
@@ -792,8 +805,9 @@ export function PracticeStage({
                   className="btn btn-secondary"
                   onClick={() => startKaraokeSegment()}
                   title="Lặp lại segment này (Phím R)"
+                  aria-label="Lặp lại"
                 >
-                  ↺ Lặp lại (R)
+                  <span aria-hidden="true">↺</span><span className="btn-label"> Lặp lại (R)</span>
                 </button>
 
                 {(mode === 'shadow' || mode === 'recall') && (
@@ -803,17 +817,20 @@ export function PracticeStage({
                       className={`btn ${isRecording ? 'btn-danger' : 'btn-accent'}`}
                       onClick={toggleMicSession}
                       data-testid="dictation-mic-btn"
+                      aria-label="Nói và chấm từ"
                     >
-                      {isRecording ? '⏹ Dừng nói' : '🎙️ Nói & Chấm từ'}
+                      <span aria-hidden="true">{isRecording ? '⏹' : '🎙️'}</span>
+                      <span className="btn-label">{isRecording ? ' Dừng nói' : ' Nói & Chấm từ'}</span>
                     </button>
                     <button
                       type="button"
                       className="btn btn-secondary"
                       onClick={() => handleSimulatedTranscript(currentSegment.en)}
                       data-testid="simulate-segment-speech-btn"
+                      aria-label="Test khớp từ"
                       title="Giả lập nhận diện giọng nói khớp câu mẫu"
                     >
-                      ⚡ Test khớp từ
+                      <span aria-hidden="true">⚡</span><span className="btn-label"> Test khớp từ</span>
                     </button>
                   </>
                 )}
@@ -826,8 +843,9 @@ export function PracticeStage({
                     setSegIndex((i) => Math.min(filteredSegments.length - 1, i + 1))
                   }
                   data-testid="next-seg-btn"
+                  aria-label="Segment tiếp"
                 >
-                  Tiếp →
+                  <span className="btn-label">Tiếp </span><span aria-hidden="true">▶▶</span>
                 </button>
               </div>
 
@@ -869,6 +887,7 @@ export function PracticeStage({
 
           {/* Template-Specific Compare 2-Column Summary or Experience STAR Summary */}
           {pack.template === 'compare' && (
+            <Collapsible title="🅰️🅱️ So sánh A / B" className="compare-wrap">
             <div className="compare-columns-card" data-testid="compare-columns-card">
               <div className="compare-col">
                 <h4>🅰️ Khi nào chọn A (choose_a)</h4>
@@ -887,10 +906,12 @@ export function PracticeStage({
                   ))}
               </div>
             </div>
+            </Collapsible>
           )}
 
           {/* Follow-up Ladder */}
           {pack.followups && pack.followups.length > 0 && (
+            <Collapsible title={`🪜 Follow-up (${pack.followups.length})`} className="followup-wrap">
             <div className="followup-ladder-card" data-testid="followup-ladder">
               <div className="followup-header">
                 <h3>🪜 Câu hỏi xoáy thêm (Follow-up Ladder)</h3>
@@ -934,10 +955,12 @@ export function PracticeStage({
                 })}
               </div>
             </div>
+            </Collapsible>
           )}
 
           {/* Local Recordings Playback */}
           {savedRecordings.length > 0 && (
+            <Collapsible title={`🎙️ Bản ghi âm (${savedRecordings.length})`} className="rec-wrap">
             <div className="recordings-card">
               <h4>🎙️ Bản ghi âm gần đây ({savedRecordings.length}/20 lưu cục bộ IndexedDB)</h4>
               <div className="recordings-list">
@@ -954,6 +977,7 @@ export function PracticeStage({
                 })}
               </div>
             </div>
+            </Collapsible>
           )}
 
           {/* Bottom Next Random Pack Bar */}
@@ -967,13 +991,15 @@ export function PracticeStage({
               className="btn btn-primary btn-next-random"
               onClick={onNextRandomPack}
               data-testid="next-random-btn"
+              aria-label="Bài ngẫu nhiên kế tiếp"
             >
-              🎲 Tiếp theo (Random Pack — Phím N) ➔
+              <span aria-hidden="true">🎲</span><span className="btn-label"> Tiếp theo (Random Pack — Phím N) ➔</span>
             </button>
           </div>
         </div>
 
         {/* Right / Bottom Column: Flow Diagram */}
+        <Collapsible title="🌳 Sơ đồ khung trả lời" className="flow-wrap">
         <FlowDiagram
           template={pack.template}
           flow={pack.flow}
@@ -985,6 +1011,7 @@ export function PracticeStage({
             if (idx >= 0) setSegIndex(idx);
           }}
         />
+        </Collapsible>
       </div>
     </section>
   );

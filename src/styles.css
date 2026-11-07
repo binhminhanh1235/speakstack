@@ -1004,3 +1004,205 @@ textarea {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
 }
+
+/* ===== Mobile UX overhaul (<= 768px) ===== */
+@media (max-width: 768px) {
+  .app-shell {
+    padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  }
+  .app-header {
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+    padding: 0.4rem 0.6rem;
+  }
+  .brand-group { flex: 1; min-width: 0; gap: 0.4rem; }
+  .brand-logo { font-size: 1.35rem; }
+  .brand-title { font-size: 1rem; }
+  .brand-sub { display: none; }
+  .storage-status-pill { display: none; }
+  .header-utils { flex-wrap: nowrap; gap: 0.25rem; flex-shrink: 0; }
+  .icon-pill-btn {
+    min-height: 40px;
+    min-width: 40px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+  }
+  /* hide verbose ON/OFF text next to icons: keep only first emoji via font trick */
+  .icon-pill-btn[data-testid='music-toggle-btn'],
+  .icon-pill-btn[data-testid='tts-toggle-btn'] {
+    font-size: 0;
+  }
+  .icon-pill-btn[data-testid='music-toggle-btn']::before { content: '🎵'; font-size: 1rem; }
+  .icon-pill-btn[data-testid='tts-toggle-btn']::before { content: '🔊'; font-size: 1rem; }
+  .icon-pill-btn[data-testid='tts-toggle-btn']:not(.active) { opacity: 0.55; }
+
+  /* Bottom tab bar navigation */
+  .main-nav {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 60;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-color);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .main-nav .nav-btn {
+    flex-direction: column;
+    gap: 0.1rem;
+    min-height: 56px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font-size: 0.68rem;
+    line-height: 1.15;
+    padding: 0.3rem 0.15rem;
+    white-space: normal;
+    text-align: center;
+  }
+  .main-nav .nav-btn.active {
+    background: rgba(56, 189, 248, 0.18);
+    color: var(--accent-primary);
+    box-shadow: inset 0 3px 0 var(--accent-primary);
+  }
+
+  .app-main { padding: 0.6rem; }
+  .practice-stage { gap: 0.65rem; }
+  .question-banner { padding: 0.8rem; }
+  .question-en { font-size: 1.1rem; }
+  .question-vi { font-size: 0.9rem; }
+  .tier-selector { flex-wrap: nowrap; overflow-x: auto; }
+  .tier-btn { white-space: nowrap; min-height: 40px; }
+
+  /* 5 mode tabs: one scrollable row */
+  .mode-tabs {
+    display: flex;
+    overflow-x: auto;
+    gap: 0.4rem;
+    scroll-snap-type: x proximity;
+    padding-bottom: 0.2rem;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mode-tab-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 0.85rem;
+    scroll-snap-align: start;
+  }
+
+  .template-stepper { scroll-snap-type: x proximity; }
+  .step-pill { min-width: 120px; flex: 0 0 auto; }
+
+  .karaoke-stage-card,
+  .free-stage-card,
+  .typing-stage-box { padding: 0.8rem; gap: 0.75rem; border-radius: 14px; }
+  .karaoke-english-words { font-size: 1.25rem; padding: 0.25rem 0; line-height: 1.6; }
+  .typing-english-line { font-size: 1.1rem; padding: 0.5rem; }
+  [data-fontsize='large'] .karaoke-english-words { font-size: 1.5rem; }
+  .karaoke-vietnamese-sub, .typing-vietnamese-sub { font-size: 0.95rem; padding: 0.6rem 0.75rem; }
+
+  .stage-controls-bar > button,
+  .next-random-footer > button { flex: 1 1 calc(50% - 0.5rem); }
+  .stage-controls-bar .btn-primary { flex-basis: 100%; }
+  .shortcut-hint { display: none; }
+  .segment-header-bar { gap: 0.4rem; }
+
+  .packs-grid,
+  .opener-cards-grid,
+  .dashboard-cards-grid,
+  .library-filters-bar { grid-template-columns: 1fr; }
+  .dictation-metrics-row { gap: 0.5rem 0.9rem; font-size: 0.85rem; }
+  .admin-top-actions > *, .admin-editor-controls > * { flex: 1 1 auto; }
+}
+
+@media (max-width: 380px) {
+  .brand-title { font-size: 0.9rem; }
+  .icon-pill-btn { min-width: 36px; padding: 0.2rem 0.35rem; }
+  .main-nav .nav-btn { font-size: 0.62rem; }
+}
+
+/* ===== Mobile focus mode: segment + play controls; rest collapsible ===== */
+.seg-full { display: inline; }
+@media (max-width: 768px) {
+  .stage-main-grid { grid-template-columns: minmax(0, 1fr); }
+  .practice-stage, .stage-primary-column, .karaoke-stage-card { min-width: 0; max-width: 100%; }
+  .karaoke-english-words, .karaoke-vietnamese-sub { overflow-wrap: anywhere; }
+
+  .m-collapse {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    min-width: 0;
+  }
+  .m-collapse-summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 0.6rem 0.85rem;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+  }
+  .m-collapse-summary::-webkit-details-marker { display: none; }
+  .m-collapse-summary::after { content: '▾'; transition: transform .15s; }
+  .m-collapse[open] > .m-collapse-summary::after { transform: rotate(180deg); }
+  .m-collapse-body { padding: 0 0.75rem 0.75rem; min-width: 0; }
+  .m-collapse-body > .followup-ladder-card,
+  .m-collapse-body > .recordings-card,
+  .m-collapse-body > .flow-card,
+  .m-collapse-body > .compare-columns-card,
+  .m-collapse-body > .next-segment-preview { background: transparent; border: 0; padding: 0; }
+  .m-collapse-body > .next-segment-preview { opacity: 1; margin: 0; }
+  .question-meta-row.m-collapse { margin-bottom: 0.5rem; }
+  .question-meta-row .m-collapse-body { display: flex; flex-wrap: wrap; gap: 0.4rem; padding-top: 0.25rem; }
+
+  /* Question: compact */
+  .question-banner { padding: 0.6rem 0.75rem; }
+  .question-en { font-size: 1rem; line-height: 1.3; }
+  .question-vi { display: none; }
+
+  /* Mode tabs: icons only, equal width */
+  .mode-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: visible; }
+  .mode-tab-btn { padding: 0.3rem; font-size: 1.2rem; }
+  .mode-tab-btn .mode-label, .btn-label { display: none; }
+  .seg-full { display: none; }
+
+  /* Segment header compact */
+  .speed-btn { min-height: 36px; padding: 0.2rem 0.5rem; font-size: 0.8rem; }
+  .karaoke-english-words { font-size: 1.35rem; }
+
+  /* Play controls: icon row */
+  .stage-controls-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  .stage-controls-bar > button {
+    flex: 1 1 0;
+    min-width: 44px;
+    max-width: 64px;
+    min-height: 48px;
+    font-size: 1.15rem;
+    padding: 0.3rem;
+  }
+  .stage-controls-bar > .btn-primary {
+    flex: 1.6 1 0;
+    max-width: 96px;
+    min-height: 52px;
+    font-size: 1.4rem;
+  }
+  .next-random-footer { padding: 0; border: 0; background: none; }
+  .next-random-footer .btn-next-random { width: 100%; font-size: 1.2rem; }
+  .followup-q-btn { font-size: 0.9rem; }
+}
+
+@media (max-width: 768px) {
+  .next-random-footer .btn-label { display: inline; }
+  .recall-level-switcher { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+  .recall-level-switcher button { font-size: 0.75rem; padding: 0.2rem; }
+}

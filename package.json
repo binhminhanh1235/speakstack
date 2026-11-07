@@ -11,10 +11,12 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@edgeone/pages-blob": "^0.0.19",
     "preact": "^10.25.4"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.9.4",
+    "@types/node": "^26.6.6",
     "typescript": "^5.7.3",
     "vite": "^6.1.0",
     "vitest": "^3.0.5"

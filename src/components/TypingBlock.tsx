@@ -191,7 +191,7 @@ export function TypingBlock({
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="off"
-        spellCheck={false}
+        spellcheck={false}
         inputMode={isSmallScreen && !enableVirtualKeyboard ? 'none' : 'text'}
         onKeyDown={handleKeyDown as any}
         onInput={handleInput}

@@ -1,3 +1,4 @@
+import { getStore } from '@edgeone/pages-blob';
 import {
   CORE_TOPICS,
   PackIndexEntry,
@@ -9,7 +10,7 @@ import {
 import { STARTER_PACKS } from '../../shared/templates';
 import { validatePack } from '../../shared/validator';
 
-// In-memory store (seeded with STARTER_PACKS on first access)
+// In-memory fallback cache
 const memoryPacks = new Map<string, SpeakPack>();
 let memoryIndex: PackIndexEntry[] = [];
 let initialized = false;
@@ -23,6 +24,88 @@ function ensureMemorySeeded() {
   initialized = true;
 }
 
+// ---------------------------------------------------------------------------
+// Tier 2: EdgeOne Pages Blob Storage Adapter
+// ---------------------------------------------------------------------------
+let cachedBlobStore: any = null;
+
+function getBlobStore(context: any = {}) {
+  if (cachedBlobStore) return cachedBlobStore;
+  try {
+    const env = context?.env || (typeof globalThis !== 'undefined' ? (globalThis as any) : {});
+    const storeName = env.EDGEONE_BLOB_STORE || env.BLOB_STORE || 'speakstack';
+    const projectId = env.EDGEONE_PROJECT_ID || env.PROJECT_ID || '';
+    const token = env.EDGEONE_BLOB_TOKEN || env.BLOB_TOKEN || '';
+
+    if (projectId && token) {
+      cachedBlobStore = getStore({
+        name: storeName,
+        projectId,
+        token,
+        consistency: 'strong'
+      });
+    } else {
+      // Automatic auth inside EdgeOne Pages Functions runtime
+      cachedBlobStore = getStore(storeName);
+    }
+    return cachedBlobStore;
+  } catch {
+    return null;
+  }
+}
+
+async function blobLoadAllPacks(context: any = {}): Promise<SpeakPack[] | null> {
+  const store = getBlobStore(context);
+  if (!store) return null;
+  try {
+    const data = await store.get('all_packs.json', { type: 'json', consistency: 'strong' });
+    if (Array.isArray(data) && data.length > 0) {
+      return data;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function blobSaveAllPacks(packs: SpeakPack[], context: any = {}): Promise<boolean> {
+  const store = getBlobStore(context);
+  if (!store) return false;
+  try {
+    const index = packs.map(toIndexEntry);
+    await store.setJSON('all_packs.json', packs);
+    await store.setJSON('index/packs.json', index);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function blobSaveSinglePack(pack: SpeakPack, context: any = {}): Promise<boolean> {
+  const store = getBlobStore(context);
+  if (!store) return false;
+  try {
+    await store.setJSON(`packs/${pack.id}.json`, pack);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function blobDeletePack(id: string, context: any = {}): Promise<boolean> {
+  const store = getBlobStore(context);
+  if (!store) return false;
+  try {
+    await store.delete(`packs/${id}.json`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tier 3: GitHub Gist Fallback Sync
+// ---------------------------------------------------------------------------
 const GIST_FILENAME = 'speakstack-packs.json';
 const GIST_DESCRIPTION = 'SpeakStack Bilingual Interview Packs (Multi-Tier Cloud Sync)';
 
@@ -37,9 +120,20 @@ function makeGistHeaders(token: string): Record<string, string> {
 
 export function resolveEnvConfig(context: any = {}) {
   const env = context?.env || (typeof globalThis !== 'undefined' ? (globalThis as any) : {});
-  const githubToken = (env.GITHUB_TOKEN || env.GIST_TOKEN || '').trim();
-  const gistId = (env.GIST_ID || '').trim();
+  const req: Request | undefined = context?.request;
+
+  let githubToken = (env.GITHUB_TOKEN || env.GIST_TOKEN || '').trim();
+  let gistId = (env.GIST_ID || '').trim();
   const mcpSecret = (env.MCP_SECRET || env.ADMIN_SECRET || '').trim();
+
+  // Allow passing Gist credentials via headers from MCP client / API callers
+  if (req?.headers) {
+    const hToken = req.headers.get('x-gist-token') || req.headers.get('x-github-token');
+    const hGistId = req.headers.get('x-gist-id');
+    if (hToken) githubToken = hToken.trim();
+    if (hGistId) gistId = hGistId.trim();
+  }
+
   return {
     githubToken,
     gistId,
@@ -116,10 +210,34 @@ async function gistSaveAll(token: string, gistId: string, packs: SpeakPack[]): P
   }
 }
 
+// ---------------------------------------------------------------------------
+// Unified Store Operations (Blob -> Gist -> Memory)
+// ---------------------------------------------------------------------------
 export async function getAllPacksFromStore(context: any = {}): Promise<SpeakPack[]> {
   ensureMemorySeeded();
-  const { hasGist, githubToken, gistId } = resolveEnvConfig(context);
 
+  // Tier 2: Read from EdgeOne Pages Blob
+  const blobPacks = await blobLoadAllPacks(context);
+  if (blobPacks && blobPacks.length > 0) {
+    for (const p of blobPacks) {
+      if (p && p.id) memoryPacks.set(p.id, p);
+    }
+    memoryIndex = Array.from(memoryPacks.values()).map(toIndexEntry);
+  } else {
+    // If blob store is available but newly initialized/empty, persist starter packs to Blob once
+    const store = getBlobStore(context);
+    if (store) {
+      try {
+        const existing = await store.get('all_packs.json');
+        if (existing === null) {
+          await blobSaveAllPacks(STARTER_PACKS, context);
+        }
+      } catch {}
+    }
+  }
+
+  // Tier 3: Fallback sync from GitHub Gist
+  const { hasGist, githubToken, gistId } = resolveEnvConfig(context);
   if (hasGist) {
     const remotePacks = await gistLoadAll(githubToken, gistId);
     if (remotePacks && remotePacks.length > 0) {
@@ -162,12 +280,22 @@ export async function getPackIndexFromStore(
 }
 
 export async function getPackByIdFromStore(id: string, context: any = {}): Promise<SpeakPack | null> {
-  ensureMemorySeeded();
-  if (memoryPacks.has(id)) {
-    return memoryPacks.get(id)!;
-  }
   const all = await getAllPacksFromStore(context);
-  return all.find((p) => p.id === id) || null;
+  const found = all.find((p) => p.id === id);
+  if (found) return found;
+
+  // Direct fetch from blob if not in full array
+  const store = getBlobStore(context);
+  if (store) {
+    try {
+      const direct = await store.get(`packs/${id}.json`, { type: 'json', consistency: 'strong' });
+      if (direct && direct.id === id) {
+        memoryPacks.set(direct.id, direct);
+        return direct;
+      }
+    } catch {}
+  }
+  return null;
 }
 
 export async function createOrUpdatePackInStore(
@@ -213,15 +341,38 @@ export async function createOrUpdatePackInStore(
     updatedAt: now
   };
 
-  // Atomic update in memory + index
+  // 1. Update in memory
   memoryPacks.set(finalPack.id, finalPack);
   memoryIndex = Array.from(memoryPacks.values()).map(toIndexEntry);
+  const allCurrentPacks = Array.from(memoryPacks.values());
 
-  const targets = ['memory_blob'];
+  const targets: string[] = [];
+
+  // 2. Persist to EdgeOne Pages Blob (Tier 2 Primary)
+  const blobSaved = await blobSaveAllPacks(allCurrentPacks, context);
+  if (blobSaved) {
+    await blobSaveSinglePack(finalPack, context);
+    targets.push('edgeone_blob');
+  }
+
+  // 3. Persist to GitHub Gist (Tier 3 Fallback)
   const { hasGist, githubToken, gistId } = resolveEnvConfig(context);
   if (hasGist) {
-    const saved = await gistSaveAll(githubToken, gistId, Array.from(memoryPacks.values()));
+    const saved = await gistSaveAll(githubToken, gistId, allCurrentPacks);
     if (saved) targets.push('github_gist');
+  }
+
+  const isPersistent = targets.includes('edgeone_blob') || targets.includes('github_gist');
+  const warnings = [...(validation.warnings || [])];
+
+  if (!isPersistent) {
+    targets.push('memory_ephemeral_only');
+    warnings.push({
+      code: 'EPHEMERAL_STORAGE_WARNING',
+      field: 'storage',
+      message:
+        'CẢNH BÁO: Pack chỉ lưu tạm vào RAM worker (chưa kết nối EdgeOne Blob hoặc GitHub Gist) và có thể mất khi worker tắt.'
+    });
   }
 
   const key = `packs/${finalPack.template}/${finalPack.topic}/${finalPack.id}.json`;
@@ -230,19 +381,26 @@ export async function createOrUpdatePackInStore(
     key,
     pack: finalPack,
     indexEntry: toIndexEntry(finalPack),
-    warnings: validation.warnings,
-    targets
+    warnings,
+    targets,
+    isPersistent
   };
 }
 
 export async function deletePackFromStore(id: string, context: any = {}) {
-  ensureMemorySeeded();
+  await getAllPacksFromStore(context);
   const existed = memoryPacks.delete(id);
   memoryIndex = Array.from(memoryPacks.values()).map(toIndexEntry);
+  const allCurrentPacks = Array.from(memoryPacks.values());
 
+  // Blob delete
+  await blobDeletePack(id, context);
+  await blobSaveAllPacks(allCurrentPacks, context);
+
+  // Gist delete
   const { hasGist, githubToken, gistId } = resolveEnvConfig(context);
   if (hasGist) {
-    await gistSaveAll(githubToken, gistId, Array.from(memoryPacks.values()));
+    await gistSaveAll(githubToken, gistId, allCurrentPacks);
   }
   return { ok: existed, id };
 }
@@ -250,6 +408,7 @@ export async function deletePackFromStore(id: string, context: any = {}) {
 export async function rebuildIndexInStore(context: any = {}) {
   const all = await getAllPacksFromStore(context);
   memoryIndex = all.map(toIndexEntry);
+  await blobSaveAllPacks(all, context);
   return {
     ok: true,
     count: memoryIndex.length,

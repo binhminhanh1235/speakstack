@@ -95,6 +95,97 @@ describe('SpeakStack MCP JSON-RPC 2.0 Server & REST API', () => {
     const randJson = await randRes.json();
     expect(randJson.pack.template).toBe('concept');
   });
+
+  it('handles MCP create_pack and get_pack operations with storage status', async () => {
+    const testPack = {
+      id: 'test-created-mcp-pack',
+      version: 1,
+      template: 'concept' as const,
+      topic: 'distributed-systems' as const,
+      tags: ['test', 'mcp'],
+      level: 'senior' as const,
+      question: {
+        en: 'What is a test pack for verifying persistent MCP creation in SpeakStack?',
+        vi: 'Test pack để kiểm chứng tạo pack MCP là gì?'
+      },
+      segments: [
+        {
+          id: 'def',
+          label: 'definition',
+          tier: 1 as const,
+          en: 'A test pack verifies that create and retrieve workflows persist correctly across calls.',
+          vi: 'Pack kiểm tra đảm bảo quy trình tạo và đọc lưu trữ chính xác.',
+          keywords: ['test pack', 'verifies']
+        },
+        {
+          id: 'why',
+          label: 'why',
+          tier: 1 as const,
+          en: 'It exists because cloud edge isolates must retain content in persistent storage backends.',
+          vi: 'Nó tồn tại vì môi trường edge phải lưu nội dung vào backend bền vững.',
+          keywords: ['exists', 'persistent storage']
+        },
+        {
+          id: 'how',
+          label: 'how',
+          tier: 2 as const,
+          en: 'Under the hood, the system saves the pack to EdgeOne Blob and synchronizes the index.',
+          vi: 'Bên trong, hệ thống lưu pack vào EdgeOne Blob và đồng bộ chỉ mục.',
+          keywords: ['EdgeOne Blob', 'synchronizes']
+        },
+        {
+          id: 'trade',
+          label: 'tradeoff',
+          tier: 2 as const,
+          en: 'The trade-off is network latency during storage write operations, but consistency is guaranteed.',
+          vi: 'Đánh đổi là độ trễ mạng khi ghi, nhưng đảm bảo tính nhất quán.',
+          keywords: ['trade-off', 'latency']
+        },
+        {
+          id: 'ex',
+          label: 'example',
+          tier: 1 as const,
+          en: 'For example, we create the pack and immediately fetch it back using get_pack tool.',
+          vi: 'Ví dụ, ta tạo pack và đọc lại ngay bằng get_pack.',
+          keywords: ['example', 'get_pack']
+        }
+      ]
+    };
+
+    // Test create_pack
+    const createReq = new Request('http://localhost:5173/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 10,
+        method: 'tools/call',
+        params: { name: 'create_pack', arguments: { pack: testPack } }
+      })
+    });
+    const createRes = await handleMcpRequest(createReq);
+    expect(createRes.status).toBe(200);
+    const createData = JSON.parse((await createRes.json()).result.content[0].text);
+    expect(createData.ok).toBe(true);
+    expect(Array.isArray(createData.targets)).toBe(true);
+
+    // Test get_pack
+    const getReq = new Request('http://localhost:5173/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 11,
+        method: 'tools/call',
+        params: { name: 'get_pack', arguments: { id: testPack.id } }
+      })
+    });
+    const getRes = await handleMcpRequest(getReq);
+    expect(getRes.status).toBe(200);
+    const getData = JSON.parse((await getRes.json()).result.content[0].text);
+    expect(getData.pack).toBeDefined();
+    expect(getData.pack.id).toBe(testPack.id);
+  });
 });
 
 describe('Phonetic & Fuzzy Technical Dictation Matching', () => {
